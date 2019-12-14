@@ -157,7 +157,7 @@ def put_command_0x12():
         if byte_values[0] == 0x4D:
             option = "(TCS34723/TCS34727)"
         else:
-            option = "unknow"
+            option = "unknown"
 
     long_desc = "Chip id={0:#04x} {1:s}".format(byte_values[0], option)
     medium_desc = "Chip id {0:#04x}".format(byte_values[0])
