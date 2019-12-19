@@ -19,15 +19,6 @@
 
 import sigrokdecode as srd
 
-'''
-OUTPUT_PYTHON format:
-    
-    Every packet receive from I2C decoder is reemited untouched.
-    See I2C decoder for details.
-    
-    No other data is emitted by this decoder
-'''
-
 masks = {
     "PON": 0x01,
     "AEN": 0x02,
@@ -39,6 +30,18 @@ masks = {
     "AVALID": 0x01,
     "WLONG": 0x02,
 }
+
+#   Current tcs3472x register, used for next read/writes
+register_id = 0
+#   Where the command start in decoder
+sequence_start = 0
+#   Where the command end in decoder
+sequence_end = 0
+#   Values read/written under current command
+byte_values = []
+#
+protocol_analyzer = None
+
 
 '''
     A collection of functions for putting data in the UI.
@@ -83,7 +86,7 @@ def evaluate_bytes_values():
     if len(byte_values) == 1:
         value = byte_values[0]
     else:
-        value =  (byte_values[1] << 8) + byte_values[0]
+        value = (byte_values[1] << 8) + byte_values[0]
     return value
 
 
@@ -226,41 +229,6 @@ def put_command():
     return [0, [long_desc, medium_desc, short_desc]]
 
 
-register_set = {
-    0x00: ["ENABLE", put_command_0x00],
-    0x01: ["ATIME", put_command_0x01],
-    0x03: ["WTIME", put_command_0x03],
-    0x04: ["AILTL", put_command_0x04],
-    0x05: ["AILTH", put_command_0x05],
-    0x06: ["AIHTL", put_command_0x06],
-    0x07: ["AIHTH", put_command_0x07],
-    0x0C: ["PERS", put_command_0x0C],
-    0x0D: ["CONFIG", put_command_0x0D],
-    0x0F: ["CONTROL", put_command_0x0F],
-    0x12: ["ID", put_command_0x12],
-    0x13: ["STATUS", put_command_0x13],
-    0x14: ["CDATAL", put_command_0x14],
-    0x15: ["CDATAH", put_command_0x15],
-    0x16: ["RDATAL", put_command_0x16],
-    0x17: ["RDATAH", put_command_0x17],
-    0x18: ["GDATAL", put_command_0x18],
-    0x19: ["GDATAH", put_command_0x19],
-    0x1A: ["BDATAL", put_command_0x1A],
-    0x1B: ["BDATAH", put_command_0x1B],
-}
-
-#   Current tcs3472x register, used for next read/writes
-register_id = 0
-#   Where the command start in decoder
-sequence_start = 0
-#   Where the command end in decoder
-sequence_end = 0
-#   Values read/written under current command
-byte_values = []
-#
-protocol_analyzer = None
-
-
 def command(ss, es, value):
     '''
     Start collecting data for a new command
@@ -310,6 +278,29 @@ def interpret_byte_values(ss, es, value):
     else:
         protocol_analyzer.put(sequence_start, sequence_end, protocol_analyzer.out_ann, put_command())
 
+
+register_set = {
+    0x00: ["ENABLE", put_command_0x00],
+    0x01: ["ATIME", put_command_0x01],
+    0x03: ["WTIME", put_command_0x03],
+    0x04: ["AILTL", put_command_0x04],
+    0x05: ["AILTH", put_command_0x05],
+    0x06: ["AIHTL", put_command_0x06],
+    0x07: ["AIHTH", put_command_0x07],
+    0x0C: ["PERS", put_command_0x0C],
+    0x0D: ["CONFIG", put_command_0x0D],
+    0x0F: ["CONTROL", put_command_0x0F],
+    0x12: ["ID", put_command_0x12],
+    0x13: ["STATUS", put_command_0x13],
+    0x14: ["CDATAL", put_command_0x14],
+    0x15: ["CDATAH", put_command_0x15],
+    0x16: ["RDATAL", put_command_0x16],
+    0x17: ["RDATAH", put_command_0x17],
+    0x18: ["GDATAL", put_command_0x18],
+    0x19: ["GDATAH", put_command_0x19],
+    0x1A: ["BDATAL", put_command_0x1A],
+    0x1B: ["BDATAH", put_command_0x1B],
+}
 
 
 class State:
@@ -414,7 +405,7 @@ class Decoder(srd.Decoder):
     desc = 'Color light-to-digital converter with IR filter'
     license = 'gplv2+'
     inputs = ['i2c']
-    outputs = ['tcs3472x']
+    outputs = []
 
     options = (
         {'id': 'device_address',
@@ -440,7 +431,6 @@ class Decoder(srd.Decoder):
 
     def start(self):
         self.out_ann = self.register(srd.OUTPUT_ANN)
-        self.out_python = self.register(srd.OUTPUT_PYTHON)
 
         self.reset()
 
@@ -453,8 +443,6 @@ class Decoder(srd.Decoder):
         global sequence_end
         global register_id
         global register_set
-
-        self.put(ss, es, self.out_python, data)
 
         ptype = data[0]
         value = data[1]
